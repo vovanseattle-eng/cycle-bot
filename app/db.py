@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import sqlite3
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import aiosqlite
@@ -138,6 +139,7 @@ def parse_date(value: str | None) -> date | None:
 async def connect() -> aiosqlite.Connection:
     global _db
     if _db is None:
+        Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
         _db = await aiosqlite.connect(DB_PATH)
         _db.row_factory = aiosqlite.Row
         await _db.execute("PRAGMA journal_mode=WAL")
