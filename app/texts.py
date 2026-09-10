@@ -132,7 +132,7 @@ def head(icon: E, title: str, slogan: str) -> str:
 
 
 def header(title: str) -> str:
-    return head(E.BELL, f"ЛУНА · {escape(title).upper()}", "Тихое обновление цикла")
+    return head(E.BELL, f"ЭТО НЕ FLO · {escape(title).upper()}", "Тихое обновление цикла")
 
 
 def kv(name: str, value: str) -> str:
@@ -158,16 +158,16 @@ def home_card(snap: CycleSnapshot, name: str = "", for_partner: bool = False, tz
     who = escape(name) if name else ""
     if for_partner and who:
         slogan = f"Цикл · {who}"
-        title = "ЛУНА · ПАРТНЁР"
+        title = "ЭТО НЕ FLO · ПАРТНЁР"
     else:
         slogan = greet(name, tz)
-        title = "ЛУНА · СЕГОДНЯ"
+        title = "ЭТО НЕ FLO · СЕГОДНЯ"
     lines = [head(E.FIRE, title, slogan), ""]
 
     if snap.phase == PHASE_UNKNOWN or snap.last_start is None:
         lines.append(named(
             "С чего начать",
-            "Нажми «Красные дни» — первый день последних месячных. Голубые луна посчитает сама.",
+            "Нажми «Красные дни» — первый день последних месячных. Голубые дни считаются сами.",
             E.INFO,
         ))
         return "\n".join(lines)
@@ -181,9 +181,11 @@ def home_card(snap: CycleSnapshot, name: str = "", for_partner: bool = False, tz
         bits.append(f"День {day} из {snap.cycle_length}")
     bits.append(_bar(snap))
     if snap.red_start and snap.red_end:
-        bits.append(f"Красные {fmt_range(snap.red_start, snap.red_end)}")
+        days_cnt = (snap.red_end - snap.red_start).days + 1
+        bits.append(f"Красные {fmt_range(snap.red_start, snap.red_end)} ({days_cnt} дн.)")
     if snap.blue_start and snap.blue_end:
-        bits.append(f"Голубые {fmt_range(snap.blue_start, snap.blue_end)}")
+        blue_cnt = (snap.blue_end - snap.blue_start).days + 1
+        bits.append(f"Голубые {fmt_range(snap.blue_start, snap.blue_end)} ({blue_cnt} дн.)")
     if snap.next_period:
         nxt = fmt_day(snap.next_period)
         if snap.days_until is not None and snap.days_until > 0:
@@ -196,24 +198,28 @@ def home_card(snap: CycleSnapshot, name: str = "", for_partner: bool = False, tz
 
 
 def calendar_card(snap: CycleSnapshot, picking: bool = False) -> str:
-    slogan = "Нажми день в сетке" if picking else "Голубые дни считает луна"
-    lines = [head(E.FILE, "ЛУНА · КАЛЕНДАРЬ", slogan), ""]
+    slogan = "Нажми день в сетке" if picking else "Голубые дни считаются сами"
+    lines = [head(E.FILE, "ЭТО НЕ FLO · КАЛЕНДАРЬ", slogan), ""]
     if snap.last_start is None:
         lines.append(named("Календарь", "Сначала поставь красные дни — сетка оживёт.", E.FILE))
         return "\n".join(lines)
     bits = ["° красные · * голубые · · сегодня"]
     if snap.red_start and snap.red_end:
-        bits.append(f"Красные {fmt_range(snap.red_start, snap.red_end)}")
+        days_cnt = (snap.red_end - snap.red_start).days + 1
+        bits.append(f"Красные {fmt_range(snap.red_start, snap.red_end)} ({days_cnt} дн.)")
     if snap.blue_start and snap.blue_end:
-        bits.append(f"Голубые {fmt_range(snap.blue_start, snap.blue_end)}")
+        blue_cnt = (snap.blue_end - snap.blue_start).days + 1
+        bits.append(f"Голубые {fmt_range(snap.blue_start, snap.blue_end)} ({blue_cnt} дн.)")
     lines.append(named("Сетка", "\n".join(bits), E.FILE))
     return "\n".join(lines)
 
 
 def period_card(snap: CycleSnapshot) -> str:
-    lines = [head(E.FIRE, "ЛУНА · КРАСНЫЕ ДНИ", "Первый день — день 1 цикла"), ""]
+    lines = [head(E.FIRE, "ЭТО НЕ FLO · КРАСНЫЕ ДНИ", "Первый день — день 1 цикла"), ""]
     if snap.red_start and snap.red_end:
-        lines.append(named("Сейчас в календаре", fmt_range(snap.red_start, snap.red_end), E.FIRE))
+        days_cnt = (snap.red_end - snap.red_start).days + 1
+        range_str = f"{fmt_range(snap.red_start, snap.red_end)} · {plural_days(days_cnt)} (включительно)"
+        lines.append(named("Сейчас в календаре", range_str, E.FIRE))
         lines.append(named(
             "Что сделать",
             "«Поправить эти» — если ошиблась в дате или длительности. «Новые начались» — если кровотечение уже следующее.",
@@ -229,7 +235,7 @@ def period_card(snap: CycleSnapshot) -> str:
 
 
 def blue_card(snap: CycleSnapshot) -> str:
-    lines = [head(E.DESIGN, "ЛУНА · ГОЛУБЫЕ ДНИ", "Считаются сами по прогнозу красных"), ""]
+    lines = [head(E.DESIGN, "ЭТО НЕ FLO · ГОЛУБЫЕ ДНИ", "Считаются сами по прогнозу красных"), ""]
     if snap.blue_start and snap.blue_end and snap.ovulation:
         status = "Сегодня как раз они"
         if snap.today < snap.blue_start:
@@ -249,7 +255,7 @@ def blue_card(snap: CycleSnapshot) -> str:
 
 
 def sex_card(rows: list[dict], share: bool) -> str:
-    lines = [head(E.STAR, "ЛУНА · БЛИЗОСТЬ", "Без морали и длинного дневника"), ""]
+    lines = [head(E.STAR, "ЭТО НЕ FLO · БЛИЗОСТЬ", "Без морали и длинного дневника"), ""]
     if rows:
         recent = "\n".join(
             f"{fmt_day(date.fromisoformat(row['day']))} · {PROTECTION_LABEL.get(row['protection'], 'Как есть')}"
@@ -263,7 +269,7 @@ def sex_card(rows: list[dict], share: bool) -> str:
 
 
 def delay_card(snap: CycleSnapshot, already: bool) -> str:
-    lines = [head(E.STATS, "ЛУНА · ЗАДЕРЖКА", "Если прогноз прошёл, а кровотечения нет"), ""]
+    lines = [head(E.STATS, "ЭТО НЕ FLO · ЗАДЕРЖКА", "Если прогноз прошёл, а кровотечения нет"), ""]
     if snap.last_start is None:
         lines.append(named("Задержка", "Без даты красных считать не из чего.", E.STATS))
         return "\n".join(lines)
@@ -298,7 +304,7 @@ def delay_card(snap: CycleSnapshot, already: bool) -> str:
 def tips_card(snap: CycleSnapshot, intent: str = INTENT_TRACK) -> str:
     phase = snap.phase if snap.phase in TIPS else PHASE_FOLLICULAR
     intent = intent if intent in INTENT_LABEL else INTENT_TRACK
-    lines = [head(E.INFO, "ЛУНА · СОВЕТЫ", PHASE_NAME.get(phase, "")), ""]
+    lines = [head(E.INFO, "ЭТО НЕ FLO · СОВЕТЫ", PHASE_NAME.get(phase, "")), ""]
     lines.append(named("Что помогает", "\n".join(TIPS[phase]), E.INFO, expandable=True))
     extra = {
         INTENT_TRY: "Если планируешь: фолиевая заранее, как скажет врач. Голубые дни — окно, не гарантия.",
@@ -312,7 +318,7 @@ def tips_card(snap: CycleSnapshot, intent: str = INTENT_TRACK) -> str:
 
 def pregnancy_card(snap: CycleSnapshot, intent: str = INTENT_TRACK, sex_rows: list[dict] | None = None) -> str:
     intent = intent if intent in INTENT_LABEL else INTENT_TRACK
-    lines = [head(E.DESIGN, "ЛУНА · БЕРЕМЕННОСТЬ", "Не тест и не контрацепция"), ""]
+    lines = [head(E.DESIGN, "ЭТО НЕ FLO · БЕРЕМЕННОСТЬ", "Не тест и не контрацепция"), ""]
     lines.append(named("Цель", INTENT_LABEL[intent], E.DESIGN))
 
     if snap.blue_start and snap.blue_end:
@@ -387,7 +393,7 @@ def pregnancy_card(snap: CycleSnapshot, intent: str = INTENT_TRACK, sex_rows: li
     elif intent == INTENT_AVOID:
         lines.append(named(
             "Если не планируешь",
-            "Луна не защита. Нужен презерватив или схема от врача, не календарь.",
+            "Календарь не защита. Нужен презерватив или схема от врача.",
             E.INFO,
             expandable=True,
         ))
@@ -408,7 +414,7 @@ def pregnancy_card(snap: CycleSnapshot, intent: str = INTENT_TRACK, sex_rows: li
 
 
 def partner_card(has_partner: bool, partner_name: str, share_sex: bool, link: str | None) -> str:
-    lines = [head(E.PROFILE, "ЛУНА · ПАРТНЁР", "Один человек, которому это можно видеть"), ""]
+    lines = [head(E.PROFILE, "ЭТО НЕ FLO · ПАРТНЁР", "Один человек, которому это можно видеть"), ""]
     if has_partner:
         lines.append(pack(
             "Доступ",
@@ -434,7 +440,7 @@ def partner_card(has_partner: bool, partner_name: str, share_sex: bool, link: st
 def partner_invite_card(owner_name: str) -> str:
     shown = escape(owner_name) or "человек"
     return (
-        f"{head(E.PROFILE, 'ЛУНА · ПРИГЛАШЕНИЕ', 'Это доверие')}\n\n"
+        f"{head(E.PROFILE, 'ЭТО НЕ FLO · ПРИГЛАШЕНИЕ', 'Это доверие')}\n\n"
         f"{named('Кто', shown, E.PROFILE)}\n"
         f"{named('Что откроется', 'Красные дни, голубые, задержка и ближайший прогноз. Можно отказаться.', E.INFO)}"
     )
@@ -443,7 +449,7 @@ def partner_invite_card(owner_name: str) -> str:
 def partner_viewer_card(owner_name: str) -> str:
     shown = escape(owner_name) or "партнёр"
     return (
-        f"{head(E.PROFILE, 'ЛУНА · ПАРТНЁР', 'Связанный цикл')}\n\n"
+        f"{head(E.PROFILE, 'ЭТО НЕ FLO · ПАРТНЁР', 'Связанный цикл')}\n\n"
         f"{pack('Статус', kv('Смотришь', shown), kv('Видно', 'Красные, голубые, задержка, прогноз'), icon=E.PROFILE)}\n"
         f"{named('Управление', 'Ты можешь отвязаться в любой момент.', E.INFO)}"
     )
@@ -463,7 +469,7 @@ def settings_card(user: dict) -> str:
     tz = TZ_LABELS.get(user.get("tz") or "", user.get("tz") or "Москва")
     notify = "Включены" if user.get("notify") else "Выключены"
     return (
-        f"{head(E.SETTINGS, 'ЛУНА · ЕЩЁ', 'Советы, партнёр и тонкая настройка')}\n\n"
+        f"{head(E.SETTINGS, 'ЭТО НЕ FLO · ЕЩЁ', 'Советы, партнёр и тонкая настройка')}\n\n"
         f"{pack('Сводка', kv('Имя', name), kv('Прогноз', mode), kv('Красные', f'{period_len} дн.'), kv('Лютеиновая', f'{luteal} дн.'), icon=E.SETTINGS)}\n"
         f"{pack('Ещё', kv('Уведомления', f'{notify} · {hour}:00'), kv('Пояс', tz), kv('Беременность', INTENT_LABEL.get(user.get('intent') or INTENT_TRACK, INTENT_LABEL[INTENT_TRACK])), icon=E.INFO)}"
     )
@@ -471,42 +477,42 @@ def settings_card(user: dict) -> str:
 
 def tos_card(name: str = "", tz: str | None = None) -> str:
     return (
-        f"{head(E.FILE, 'ЛУНА', greet(name, tz))}\n\n"
+        f"{head(E.FILE, 'ЭТО НЕ FLO', greet(name, tz))}\n\n"
         f"{named('Чтобы начать', 'Открой соглашение, подпишись на канал и нажми «Принимаю».', E.CHECK)}"
     )
 
 
 def onboard_intro(name: str = "", tz: str | None = None) -> str:
     return (
-        f"{head(E.FIRE, 'ЛУНА', greet(name, tz))}\n\n"
-        f"{named('Как это работает', 'Красные дни ставишь ты. Голубые луна считает сама. Остальное — по желанию.', E.INFO)}"
+        f"{head(E.FIRE, 'ЭТО НЕ FLO', greet(name, tz))}\n\n"
+        f"{named('Как это работает', 'Красные дни ставишь ты. Голубые дни считаются сами. Остальное — по желанию.', E.INFO)}"
     )
 
 
 def sex_saved(day_label: str, protection: str) -> str:
     extra = PROTECTION_LABEL.get(protection, "")
     return (
-        f"{head(E.CHECK, 'ЛУНА · ОТМЕЧЕНО', 'Тихо легло в календарь')}\n\n"
+        f"{head(E.CHECK, 'ЭТО НЕ FLO · ОТМЕЧЕНО', 'Тихо легло в календарь')}\n\n"
         f"{named('Запись', f'{day_label} · {extra}', E.CHECK)}"
     )
 
 
 def period_saved(day_label: str, length: int) -> str:
     return (
-        f"{head(E.CHECK, 'ЛУНА · КРАСНЫЕ СТОЯТ', 'Теперь выбери, когда следующие')}\n\n"
+        f"{head(E.CHECK, 'ЭТО НЕ FLO · КРАСНЫЕ СТОЯТ', 'Теперь выбери, когда следующие')}\n\n"
         f"{named('Старт', f'{day_label} · {length} дн.', E.FIRE)}"
     )
 
 
 def pick_day_card(kind: str, day_label: str) -> str:
     if kind == "sex":
-        return f"{head(E.STAR, 'ЛУНА · БЛИЗОСТЬ', day_label)}\n\n{named('Как отметить', 'С защитой, без или молча.', E.STAR)}"
-    return f"{head(E.FIRE, 'ЛУНА · КРАСНЫЕ ДНИ', f'Старт · {day_label}')}\n\n{named('Длительность', 'Сколько дней обычно идёт', E.FIRE)}"
+        return f"{head(E.STAR, 'ЭТО НЕ FLO · БЛИЗОСТЬ', day_label)}\n\n{named('Как отметить', 'С защитой, без или молча.', E.STAR)}"
+    return f"{head(E.FIRE, 'ЭТО НЕ FLO · КРАСНЫЕ ДНИ', f'Старт · {day_label}')}\n\n{named('Длительность', 'Сколько дней обычно идёт (включая первый день)', E.FIRE)}"
 
 
 def cycle_len_card() -> str:
     return (
-        f"{head(E.STATS, 'ЛУНА · СЛЕДУЮЩИЕ КРАСНЫЕ', 'Это не 28 дней у всех')}\n\n"
+        f"{head(E.STATS, 'ЭТО НЕ FLO · СЛЕДУЮЩИЕ КРАСНЫЕ', 'Это не 28 дней у всех')}\n\n"
         f"{named('Как выбрать', 'Если обычно одно и то же число месяца — жми «То же число». 16 августа даст 16 сентября, а не 13-е.', E.STATS)}"
     )
 
@@ -517,10 +523,10 @@ def settings_cycle_card(user: dict, snap: CycleSnapshot) -> str:
     cl = user.get("cycle_length", 28)
     pl = user.get("period_length", 5)
     lu = user.get("luteal_days", 14)
-    fb = user.get("fertile_before", 5)
-    fa = user.get("fertile_after", 1)
+    fb = user.get("fertile_before", 6)
+    fa = user.get("fertile_after", 3)
     return (
-        f"{head(E.STATS, 'ЛУНА · ЦИКЛ', 'Прогноз следующих красных')}\n\n"
+        f"{head(E.STATS, 'ЭТО НЕ FLO · ЦИКЛ', 'Прогноз следующих красных')}\n\n"
         f"{pack('Прогноз', kv('Режим', mode), kv('Длина', f'{cl} дн.'), kv('Следующие', nxt), icon=E.STATS)}\n"
         f"{pack('Фазы', kv('Красные', f'{pl} дн.'), kv('Лютеиновая', f'{lu} дн.'), kv('Голубые', f'{fb} до овуляции, {fa} после'), icon=E.DESIGN)}"
     )
@@ -532,7 +538,7 @@ def settings_notify_card(user: dict) -> str:
 
     hour = user.get("notify_hour", 9)
     return (
-        f"{head(E.BELL, 'ЛУНА · УВЕДОМЛЕНИЯ', 'Утром, без спама')}\n\n"
+        f"{head(E.BELL, 'ЭТО НЕ FLO · УВЕДОМЛЕНИЯ', 'Утром, без спама')}\n\n"
         f"{pack('Рассылка', kv('Все', on('notify')), kv('Час', f'{hour}:00'), kv('Красные сегодня', on('notify_red')), kv('За день до', on('notify_before')), kv('Голубые', on('notify_blue')), kv('Задержка', on('notify_delay')), icon=E.BELL)}"
     )
 
@@ -542,7 +548,7 @@ def settings_privacy_card(user: dict) -> str:
         return "Видит" if user.get(key, default) else "Скрыто"
 
     return (
-        f"{head(E.PROFILE, 'ЛУНА · ПРИВАТНОСТЬ', 'Что видит партнёр')}\n\n"
+        f"{head(E.PROFILE, 'ЭТО НЕ FLO · ПРИВАТНОСТЬ', 'Что видит партнёр')}\n\n"
         f"{pack('Партнёр', kv('Близость', vis('share_sex', 0)), kv('Задержка', vis('share_delay', 1)), kv('Дневник', vis('share_diary', 0)), icon=E.PROFILE)}\n"
         f"{named('Цикл', 'Красные, голубые и прогноз видны всегда, если партнёр привязан.', E.STATS)}"
     )
@@ -551,7 +557,7 @@ def settings_privacy_card(user: dict) -> str:
 def settings_tz_card(user: dict) -> str:
     tz = TZ_LABELS.get(user.get("tz") or "", user.get("tz") or "Москва")
     return (
-        f"{head(E.NAV, 'ЛУНА · ЧАСОВОЙ ПОЯС', 'Для «сегодня» и уведомлений')}\n\n"
+        f"{head(E.NAV, 'ЭТО НЕ FLO · ЧАСОВОЙ ПОЯС', 'Для «сегодня» и уведомлений')}\n\n"
         f"{named('Сейчас', tz, E.NAV)}"
     )
 
@@ -564,7 +570,7 @@ def diary_card(entry: dict, snap: CycleSnapshot) -> str:
     codes = entry.get("symptoms") or []
     sym = ", ".join(SYMPTOMS[c] for c in codes if c in SYMPTOMS) or "Нет"
     return (
-        f"{head(E.EDIT, 'ЛУНА · ДНЕВНИК', f'Сегодня · {fmt_day(snap.today)}')}\n\n"
+        f"{head(E.EDIT, 'ЭТО НЕ FLO · ДНЕВНИК', f'Сегодня · {fmt_day(snap.today)}')}\n\n"
         f"{pack('Самочувствие', kv('Настроение', mood), kv('Выделения', flow), kv('Боль', str(pain)), kv('Симптомы', sym), icon=E.EDIT)}\n"
         f"{named('Заметка', note, E.WRITE)}"
     )
@@ -574,7 +580,7 @@ def history_card(rows: list[dict], snap: CycleSnapshot) -> str:
     nxt = fmt_day(snap.next_period) if snap.next_period else "—"
     if not rows:
         return (
-            f"{head(E.FILE, 'ЛУНА · ИСТОРИЯ', 'Прошлые красные и средний цикл')}\n\n"
+            f"{head(E.FILE, 'ЭТО НЕ FLO · ИСТОРИЯ', 'Прошлые красные и средний цикл')}\n\n"
             f"{named('Записи', 'Пока нет сохранённых циклов.', E.FILE)}\n"
             f"{named('Следующие', nxt, E.STATS)}"
         )
@@ -588,7 +594,7 @@ def history_card(rows: list[dict], snap: CycleSnapshot) -> str:
     )
     extra = f"\nСредний цикл {avg} дн." if gaps else ""
     return (
-        f"{head(E.FILE, 'ЛУНА · ИСТОРИЯ', 'Прошлые красные и средний цикл')}\n\n"
+        f"{head(E.FILE, 'ЭТО НЕ FLO · ИСТОРИЯ', 'Прошлые красные и средний цикл')}\n\n"
         f"{named('Записи', listed + extra, E.FILE)}\n"
         f"{named('Следующие', nxt, E.STATS)}"
     )

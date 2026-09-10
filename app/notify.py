@@ -38,7 +38,7 @@ async def ping_viewers(bot: Bot, owner: dict, kind: str, extra: str = "") -> Non
     if kind == "delay" and not owner.get("share_delay", 1):
         return
 
-    text = f"{head(E.PROFILE, 'ЛУНА · ПАРТНЁР', 'Тихое обновление')}\n\n{named('Что случилось', body, E.PROFILE)}"
+    text = f"{head(E.PROFILE, 'ЭТО НЕ FLO · ПАРТНЁР', 'Тихое обновление')}\n\n{named('Что случилось', body, E.PROFILE)}"
     for viewer_id in await db.viewers_of(owner["tg_id"]):
         try:
             await bot.send_message(viewer_id, text)
@@ -56,15 +56,15 @@ async def daily_tick(bot: Bot) -> None:
             continue
         kinds: list[tuple[str, str]] = []
         if user.get("notify_red", 1) and snap.phase == PHASE_PERIOD and snap.red_start == snap.today:
-            kinds.append(("red_today", f"{head(E.FIRE, 'ЛУНА · КРАСНЫЕ ДНИ', '')}\n\n{named('Сегодня', 'Первый день цикла.', E.FIRE)}"))
+            kinds.append(("red_today", f"{head(E.FIRE, 'ЭТО НЕ FLO · КРАСНЫЕ ДНИ', '')}\n\n{named('Сегодня', 'Первый день цикла.', E.FIRE)}"))
         if user.get("notify_blue", 1) and snap.phase == PHASE_FERTILE and snap.blue_start == snap.today:
-            kinds.append(("blue_today", f"{head(E.DESIGN, 'ЛУНА · ГОЛУБЫЕ ДНИ', '')}\n\n{named('Окно', 'Открылось. Это оценка, не контрацепция.', E.DESIGN)}"))
+            kinds.append(("blue_today", f"{head(E.DESIGN, 'ЭТО НЕ FLO · ГОЛУБЫЕ ДНИ', '')}\n\n{named('Окно', 'Открылось. Это оценка, не контрацепция.', E.DESIGN)}"))
         if user.get("notify_delay", 1) and snap.phase == PHASE_DELAY and snap.delay_days == 1:
-            kinds.append(("delay_1", f"{head(E.STATS, 'ЛУНА · ЗАДЕРЖКА', '')}\n\n{named('Статус', 'Прогноз красных уже вчера.', E.STATS)}"))
+            kinds.append(("delay_1", f"{head(E.STATS, 'ЭТО НЕ FLO · ЗАДЕРЖКА', '')}\n\n{named('Статус', 'Прогноз красных уже вчера.', E.STATS)}"))
         if user.get("notify_delay", 1) and snap.phase == PHASE_DELAY and snap.delay_days == 7:
-            kinds.append(("delay_7", f"{head(E.STATS, 'ЛУНА · ЗАДЕРЖКА', '')}\n\n{named('Статус', 'Неделя. Если был секс без защиты — тест.', E.STATS)}"))
+            kinds.append(("delay_7", f"{head(E.STATS, 'ЭТО НЕ FLO · ЗАДЕРЖКА', '')}\n\n{named('Статус', 'Неделя. Если был секс без защиты — тест.', E.STATS)}"))
         if user.get("notify_before", 1) and snap.next_period and (snap.next_period - snap.today).days == 1:
-            kinds.append(("red_tomorrow", f"{head(E.BELL, 'ЛУНА · ЗАВТРА', '')}\n\n{named('Прогноз', 'Завтра красные дни.', E.BELL)}"))
+            kinds.append(("red_tomorrow", f"{head(E.BELL, 'ЭТО НЕ FLO · ЗАВТРА', '')}\n\n{named('Прогноз', 'Завтра красные дни.', E.BELL)}"))
 
         for kind, text in kinds:
             if await db.notify_once(user["tg_id"], kind, snap.today):

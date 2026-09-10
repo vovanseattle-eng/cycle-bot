@@ -73,7 +73,7 @@ async def main() -> None:
 
     health_runner = await start_health_server()
     await set_bot_commands(bot)
-    log.info("луна слушает")
+    log.info("это не Flo слушает")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:

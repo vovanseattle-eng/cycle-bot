@@ -803,7 +803,7 @@ async def adj_value(call: CallbackQuery) -> None:
         "pl": ("period_length", 2, 12),
         "lu": ("luteal_days", 10, 16),
         "fb": ("fertile_before", 1, 8),
-        "fa": ("fertile_after", 0, 3),
+        "fa": ("fertile_after", 0, 5),
         "nh": ("notify_hour", 6, 22),
     }
     if key not in bounds:
@@ -811,7 +811,8 @@ async def adj_value(call: CallbackQuery) -> None:
         return
     field, lo, hi = bounds[key]
     user = await load(call.from_user.id)
-    cur = int(user.get(field) or lo)
+    default_val = 6 if key == "fb" else 3 if key == "fa" else lo
+    cur = int(user.get(field) if user.get(field) is not None else default_val)
     nxt = min(hi, max(lo, cur + delta))
     await db.update_user(user["tg_id"], **{field: nxt})
     fresh = await load(call.from_user.id)

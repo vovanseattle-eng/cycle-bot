@@ -26,10 +26,19 @@ def test_blue_window_uses_luteal_14():
     start = date(2026, 9, 1)
     blue_start, ovulation, blue_end = blue_window(start, 28)
     assert ovulation == date(2026, 9, 14)
-    assert blue_start == date(2026, 9, 9)
-    assert blue_end == date(2026, 9, 15)
+    assert blue_start == date(2026, 9, 8)
+    assert blue_end == date(2026, 9, 17)
     snap = snapshot(start, 28, 5, date(2026, 9, 14))
     assert snap.phase == PHASE_FERTILE
+
+
+def test_flo_matching_case():
+    start = date(2026, 8, 16)
+    nxt = date(2026, 9, 16)
+    blue_start, ovulation, blue_end = blue_window(start, 31, next_date=nxt)
+    assert ovulation == date(2026, 9, 1)
+    assert blue_start == date(2026, 8, 26)  # с 26
+    assert blue_end == date(2026, 9, 4)     # по 4
 
 
 def test_longer_cycle_shifts_ovulation():

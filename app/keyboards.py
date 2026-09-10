@@ -316,8 +316,8 @@ def settings_cycle_kb(user: dict) -> InlineKeyboardMarkup:
     cl = int(user.get("cycle_length") or 28)
     pl = int(user.get("period_length") or 5)
     lu = int(user.get("luteal_days") or 14)
-    fb = int(user.get("fertile_before") or 5)
-    fa = int(user.get("fertile_after") or 1)
+    fb = int(user.get("fertile_before") if user.get("fertile_before") is not None else 6)
+    fa = int(user.get("fertile_after") if user.get("fertile_after") is not None else 3)
     mode = "Прогноз: число месяца" if user.get("predict_mode") == "monthly" else "Прогноз: интервал"
     b = InlineKeyboardBuilder()
     _b(b, mode, "tgl:predict_mode", E.SETTINGS)

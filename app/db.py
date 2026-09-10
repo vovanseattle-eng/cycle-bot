@@ -98,8 +98,8 @@ CREATE TABLE IF NOT EXISTS symptoms (
 
 USER_COLUMNS = {
     "luteal_days": "INTEGER NOT NULL DEFAULT 14",
-    "fertile_before": "INTEGER NOT NULL DEFAULT 5",
-    "fertile_after": "INTEGER NOT NULL DEFAULT 1",
+    "fertile_before": "INTEGER NOT NULL DEFAULT 6",
+    "fertile_after": "INTEGER NOT NULL DEFAULT 3",
     "predict_mode": "TEXT NOT NULL DEFAULT 'interval'",
     "next_override": "TEXT",
     "notify_hour": "INTEGER NOT NULL DEFAULT 9",
@@ -120,6 +120,8 @@ async def _migrate(db: aiosqlite.Connection) -> None:
     for name, spec in USER_COLUMNS.items():
         if name not in have:
             await db.execute(f"ALTER TABLE users ADD COLUMN {name} {spec}")
+    await db.execute("UPDATE users SET fertile_before = 6 WHERE fertile_before = 5")
+    await db.execute("UPDATE users SET fertile_after = 3 WHERE fertile_after = 1")
     await db.commit()
 
 

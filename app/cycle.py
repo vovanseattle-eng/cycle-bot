@@ -30,8 +30,8 @@ class CycleConfig:
     cycle_length: int = 28
     period_length: int = 5
     luteal_days: int = 14
-    fertile_before: int = 5
-    fertile_after: int = 1
+    fertile_before: int = 6
+    fertile_after: int = 3
     predict_mode: str = MODE_INTERVAL
     next_override: date | None = None
 
@@ -100,8 +100,8 @@ def cfg_from_user(user: dict, today: date) -> CycleConfig:
         cycle_length=int(user.get("cycle_length") or 28),
         period_length=int(user.get("period_length") or 5),
         luteal_days=int(user.get("luteal_days") or 14),
-        fertile_before=int(user.get("fertile_before") or 5),
-        fertile_after=int(user.get("fertile_after") or 1),
+        fertile_before=int(user.get("fertile_before") if user.get("fertile_before") is not None else 6),
+        fertile_after=int(user.get("fertile_after") if user.get("fertile_after") is not None else 3),
         predict_mode=user.get("predict_mode") or MODE_INTERVAL,
         next_override=nxt,
     )
@@ -137,8 +137,8 @@ def blue_window(
     start: date,
     cycle_length: int,
     luteal_days: int = 14,
-    fertile_before: int = 5,
-    fertile_after: int = 1,
+    fertile_before: int = 6,
+    fertile_after: int = 3,
     next_date: date | None = None,
 ) -> tuple[date, date, date]:
     nxt = next_date or (start + timedelta(days=clamp_cycle_length(cycle_length)))
@@ -146,7 +146,7 @@ def blue_window(
     ovu_day = ovulation_cycle_day(span, luteal_days)
     ovulation = start + timedelta(days=ovu_day - 1)
     before = clamp_fertile(fertile_before, 1, 8)
-    after = clamp_fertile(fertile_after, 0, 3)
+    after = clamp_fertile(fertile_after, 0, 5)
     return (
         ovulation - timedelta(days=before),
         ovulation,
@@ -173,8 +173,8 @@ def snapshot(
     period_length: int,
     today: date,
     luteal_days: int = 14,
-    fertile_before: int = 5,
-    fertile_after: int = 1,
+    fertile_before: int = 6,
+    fertile_after: int = 3,
     predict_mode: str = MODE_INTERVAL,
     next_override: date | None = None,
 ) -> CycleSnapshot:
@@ -280,8 +280,8 @@ def marks_for_month(
     month: int,
     horizon_cycles: int = 4,
     luteal_days: int = 14,
-    fertile_before: int = 5,
-    fertile_after: int = 1,
+    fertile_before: int = 6,
+    fertile_after: int = 3,
     predict_mode: str = MODE_INTERVAL,
     next_override: date | None = None,
 ) -> tuple[set[date], set[date], date | None]:

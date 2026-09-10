@@ -26,17 +26,36 @@ _ids: dict[str, str] = {}
 _kinds: dict[str, str] = {}
 _disk_loaded = False
 
-# Имена файлов, которые отличаются от ключа экрана.
+# Имена файлов, которые отличаются от ключа экрана или маппятся на существующие баннеры.
 BANNER_ALIAS = {
     "welcome": "privetstvie",
+    "home": "home",
+    "period": "sex",
+    "fertile": "tips",
+    "sex": "sex",
+    "delay": "delay",
+    "tips": "tips",
+    "diary": "tips",
+    "partner": "partner",
+    "preg": "preg",
+    "calendar": "preg",
+    "history": "preg",
+    "settings": "home",
 }
 
 BANNER_FALLBACK = {
-    "period": "home",
-    "fertile": "home",
-    "calendar": "home",
+    "period": "sex",
+    "fertile": "tips",
+    "calendar": "preg",
+    "history": "preg",
     "settings": "home",
-    "history": "home",
+    "diary": "tips",
+    "welcome": "privetstvie",
+    "partner": "partner",
+    "delay": "delay",
+    "preg": "preg",
+    "sex": "sex",
+    "tips": "tips",
 }
 
 
