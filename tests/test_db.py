@@ -159,5 +159,31 @@ def test_notify_once(temp_db):
         assert await db.notify_once(500, "red_today", today) is True
         assert await db.notify_once(500, "red_today", today) is False
         assert await db.notify_once(500, "delay_1", today) is True
+    asyncio.run(run())
+
+
+def test_to_pg():
+    assert db._to_pg("SELECT 1") == "SELECT 1"
+    assert db._to_pg("SELECT * FROM users WHERE tg_id = ?") == "SELECT * FROM users WHERE tg_id = $1"
+    assert (
+        db._to_pg("INSERT INTO users (tg_id, name, created_at) VALUES (?, ?, ?)")
+        == "INSERT INTO users (tg_id, name, created_at) VALUES ($1, $2, $3)"
+    )
+
+
+def test_pg_cursor():
+    async def run():
+        cursor = db.PgCursor([{"id": 1, "name": "a"}, {"id": 2, "name": "b"}])
+        first = await cursor.fetchone()
+        assert first == {"id": 1, "name": "a"}
+        second = await cursor.fetchone()
+        assert second == {"id": 2, "name": "b"}
+        third = await cursor.fetchone()
+        assert third is None
+
+        cursor2 = db.PgCursor([{"val": 10}, {"val": 20}])
+        all_rows = await cursor2.fetchall()
+        assert all_rows == [{"val": 10}, {"val": 20}]
 
     asyncio.run(run())
+

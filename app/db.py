@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
+import asyncpg
 
-from app.config import DB_PATH
+from app.config import DATABASE_URL, DB_PATH
 
-_db: aiosqlite.Connection | None = None
+_db: aiosqlite.Connection | PostgresClient | None = None
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -97,6 +98,83 @@ CREATE TABLE IF NOT EXISTS symptoms (
 );
 """
 
+SCHEMA_PG = """
+CREATE TABLE IF NOT EXISTS users (
+    tg_id BIGINT PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    cycle_length INTEGER NOT NULL DEFAULT 28,
+    period_length INTEGER NOT NULL DEFAULT 5,
+    tz TEXT NOT NULL DEFAULT 'Europe/Moscow',
+    notify INTEGER NOT NULL DEFAULT 1,
+    share_sex INTEGER NOT NULL DEFAULT 0,
+    last_start TEXT,
+    onboarded INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS periods (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(tg_id),
+    start_date TEXT NOT NULL,
+    length INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sex_logs (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(tg_id),
+    day TEXT NOT NULL,
+    protection TEXT NOT NULL DEFAULT 'skip',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS delay_marks (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(tg_id),
+    expected_date TEXT NOT NULL,
+    marked_at TEXT NOT NULL,
+    UNIQUE (user_id, expected_date)
+);
+
+CREATE TABLE IF NOT EXISTS partnerships (
+    owner_id BIGINT NOT NULL REFERENCES users(tg_id),
+    viewer_id BIGINT NOT NULL REFERENCES users(tg_id),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (owner_id, viewer_id)
+);
+
+CREATE TABLE IF NOT EXISTS invites (
+    code TEXT PRIMARY KEY,
+    owner_id BIGINT NOT NULL REFERENCES users(tg_id),
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notify_sent (
+    user_id BIGINT NOT NULL,
+    kind TEXT NOT NULL,
+    day TEXT NOT NULL,
+    PRIMARY KEY (user_id, kind, day)
+);
+
+CREATE TABLE IF NOT EXISTS diary (
+    user_id BIGINT NOT NULL,
+    day TEXT NOT NULL,
+    mood TEXT NOT NULL DEFAULT '',
+    flow TEXT NOT NULL DEFAULT '',
+    pain INTEGER NOT NULL DEFAULT 0,
+    note TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, day)
+);
+
+CREATE TABLE IF NOT EXISTS symptoms (
+    user_id BIGINT NOT NULL,
+    day TEXT NOT NULL,
+    code TEXT NOT NULL,
+    PRIMARY KEY (user_id, day, code)
+);
+"""
+
 USER_COLUMNS = {
     "luteal_days": "INTEGER NOT NULL DEFAULT 14",
     "fertile_before": "INTEGER NOT NULL DEFAULT 6",
@@ -115,6 +193,58 @@ USER_COLUMNS = {
 }
 
 
+def _to_pg(query: str) -> str:
+    parts = query.split("?")
+    if len(parts) == 1:
+        return query
+    out = [parts[0]]
+    for idx, part in enumerate(parts[1:], start=1):
+        out.append(f"${idx}{part}")
+    return "".join(out)
+
+
+class PgCursor:
+    def __init__(self, rows: list[dict[str, Any]] | None = None):
+        self._rows = rows or []
+        self._idx = 0
+
+    async def fetchone(self) -> dict[str, Any] | None:
+        if self._idx < len(self._rows):
+            row = self._rows[self._idx]
+            self._idx += 1
+            return row
+        return None
+
+    async def fetchall(self) -> list[dict[str, Any]]:
+        remaining = self._rows[self._idx :]
+        self._idx = len(self._rows)
+        return remaining
+
+
+class PostgresClient:
+    def __init__(self, pool: asyncpg.Pool):
+        self._pool = pool
+
+    async def execute(self, query: str, params: tuple[Any, ...] | list[Any] = ()) -> PgCursor:
+        pg_query = _to_pg(query)
+        stripped = pg_query.strip().upper()
+        if stripped.startswith("SELECT") or stripped.startswith("WITH") or "RETURNING" in stripped:
+            records = await self._pool.fetch(pg_query, *params)
+            return PgCursor([dict(r) for r in records])
+        else:
+            await self._pool.execute(pg_query, *params)
+            return PgCursor([])
+
+    async def executescript(self, script: str) -> None:
+        await self._pool.execute(script)
+
+    async def commit(self) -> None:
+        pass
+
+    async def close(self) -> None:
+        await self._pool.close()
+
+
 async def _migrate(db: aiosqlite.Connection) -> None:
     cur = await db.execute("PRAGMA table_info(users)")
     have = {row[1] for row in await cur.fetchall()}
@@ -124,6 +254,19 @@ async def _migrate(db: aiosqlite.Connection) -> None:
     await db.execute("UPDATE users SET fertile_before = 6 WHERE fertile_before = 5")
     await db.execute("UPDATE users SET fertile_after = 3 WHERE fertile_after = 1")
     await db.commit()
+
+
+async def _migrate_pg(client: PostgresClient) -> None:
+    cur = await client.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'users'"
+    )
+    rows = await cur.fetchall()
+    have = {r["column_name"].lower() for r in rows}
+    for name, spec in USER_COLUMNS.items():
+        if name.lower() not in have:
+            await client.execute(f"ALTER TABLE users ADD COLUMN {name} {spec}")
+    await client.execute("UPDATE users SET fertile_before = 6 WHERE fertile_before = 5")
+    await client.execute("UPDATE users SET fertile_after = 3 WHERE fertile_after = 1")
 
 
 def _now() -> str:
@@ -136,20 +279,34 @@ def parse_date(value: str | None) -> date | None:
     return date.fromisoformat(value)
 
 
-async def connect() -> aiosqlite.Connection:
+async def connect() -> aiosqlite.Connection | PostgresClient:
     global _db
     if _db is None:
-        Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-        _db = await aiosqlite.connect(DB_PATH)
-        _db.row_factory = aiosqlite.Row
-        await _db.execute("PRAGMA journal_mode=WAL")
-        await _db.execute("PRAGMA synchronous=NORMAL")
-        await _db.execute("PRAGMA temp_store=MEMORY")
-        await _db.execute("PRAGMA cache_size=-8000")
-        await _db.execute("PRAGMA busy_timeout=5000")
-        await _db.executescript(SCHEMA)
-        await _migrate(_db)
-        await _db.commit()
+        if DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://"):
+            connect_kwargs = {}
+            if (
+                "sslmode" not in DATABASE_URL.lower()
+                and "localhost" not in DATABASE_URL.lower()
+                and "127.0.0.1" not in DATABASE_URL.lower()
+            ):
+                connect_kwargs["ssl"] = "require"
+            pool = await asyncpg.create_pool(dsn=DATABASE_URL, min_size=1, max_size=10, **connect_kwargs)
+            client = PostgresClient(pool)
+            await client.executescript(SCHEMA_PG)
+            await _migrate_pg(client)
+            _db = client
+        else:
+            Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+            _db = await aiosqlite.connect(DB_PATH)
+            _db.row_factory = aiosqlite.Row
+            await _db.execute("PRAGMA journal_mode=WAL")
+            await _db.execute("PRAGMA synchronous=NORMAL")
+            await _db.execute("PRAGMA temp_store=MEMORY")
+            await _db.execute("PRAGMA cache_size=-8000")
+            await _db.execute("PRAGMA busy_timeout=5000")
+            await _db.executescript(SCHEMA)
+            await _migrate(_db)
+            await _db.commit()
     return _db
 
 
@@ -369,8 +526,10 @@ async def mark_delay(user_id: int, expected: date) -> bool:
         )
         await db.commit()
         return True
-    except sqlite3.IntegrityError:
-        return False
+    except (sqlite3.IntegrityError, Exception) as e:
+        if isinstance(e, sqlite3.IntegrityError) or "unique" in str(e).lower() or "duplicate" in str(e).lower():
+            return False
+        raise
 
 
 async def delay_marked(user_id: int, expected: date) -> bool:
@@ -469,5 +628,7 @@ async def notify_once(user_id: int, kind: str, day: date) -> bool:
         )
         await db.commit()
         return True
-    except sqlite3.IntegrityError:
-        return False
+    except (sqlite3.IntegrityError, Exception) as e:
+        if isinstance(e, sqlite3.IntegrityError) or "unique" in str(e).lower() or "duplicate" in str(e).lower():
+            return False
+        raise
