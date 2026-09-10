@@ -12,12 +12,33 @@ from aiogram.types import BotCommand, BotCommandScopeDefault, MenuButtonCommands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from app.config import BOT_TOKEN, DEFAULT_TZ
+from aiohttp import web
+
+from app.config import BOT_TOKEN, DEFAULT_TZ, PORT
 from app.db import close, connect
 from app.handlers import router
 from app.notify import daily_tick
 
 log = logging.getLogger("luna")
+
+
+async def start_health_server() -> web.AppRunner | None:
+    """Запускает легковесный HTTP сервер для Render Health Check."""
+    if not PORT:
+        return None
+    try:
+        app = web.Application()
+        app.router.add_get("/", lambda r: web.Response(text="Luna Cycle Bot is running!"))
+        app.router.add_get("/health", lambda r: web.Response(text="OK"))
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", PORT)
+        await site.start()
+        log.info("Health-check HTTP сервер запущен на порту %s", PORT)
+        return runner
+    except Exception as e:
+        log.warning("Не удалось запустить health-check сервер: %s", e)
+        return None
 
 
 async def set_bot_commands(bot: Bot) -> None:
@@ -50,11 +71,14 @@ async def main() -> None:
     scheduler.add_job(daily_tick, CronTrigger(minute=0), args=[bot])
     scheduler.start()
 
+    health_runner = await start_health_server()
     await set_bot_commands(bot)
     log.info("луна слушает")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        if health_runner:
+            await health_runner.cleanup()
         scheduler.shutdown(wait=False)
         await close()
         await bot.session.close()

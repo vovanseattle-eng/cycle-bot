@@ -16,3 +16,5 @@ TOS_ARTICLE_URL = os.getenv("TOS_ARTICLE_URL", "https://telegra.ph/Soglashenie--
 DEFAULT_TZ = os.getenv("TZ", "Europe/Moscow")
 DB_PATH = ROOT / os.getenv("DB_PATH", "luna.db")
 BANNERS_DIR = ROOT / "assets" / "banners"
+PORT = int(os.getenv("PORT", "0")) if os.getenv("PORT") else 0
+
