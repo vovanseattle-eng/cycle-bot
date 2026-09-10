@@ -32,6 +32,7 @@ from app.keyboards import (
     next_period_kb,
     pair_confirm_kb,
     partner_kb,
+    partner_viewer_kb,
     period_actions_kb,
     period_edit_kb,
     period_len_kb,
@@ -118,6 +119,8 @@ router.callback_query.middleware(FastAck())
 
 
 async def is_subscribed(bot, user_id: int) -> tuple[bool, str]:
+    if not CHANNEL_USERNAME:
+        return True, ""
     try:
         member = await bot.get_chat_member(f"@{CHANNEL_USERNAME}", user_id)
     except Exception as e:
@@ -252,11 +255,12 @@ async def show_partner(target: Message | CallbackQuery) -> None:
     owners = await db.owners_for_viewer(user["tg_id"])
     if owners and not user.get("onboarded"):
         owner = owners[0]
+        owner_name = (owner.get("name") or "партнёр").strip()
         await show(
             target,
             "partner",
-            texts.home_card(user_snap(owner), name=owner.get("name") or "", for_partner=True),
-            main_menu_kb(viewer=True),
+            texts.partner_viewer_card(owner_name),
+            partner_viewer_kb(),
         )
         return
     partner = await db.partner_of(user["tg_id"])
@@ -687,6 +691,10 @@ async def pair_invite(call: CallbackQuery) -> None:
 async def pair_drop(call: CallbackQuery) -> None:
     await db.unbind_partner(call.from_user.id)
     user = await load(call.from_user.id)
+    if not user.get("onboarded"):
+        await call.answer("Связь отключена")
+        await show(call, "welcome", texts.onboard_intro(user.get("name") or "", user.get("tz")), start_kb())
+        return
     await show(call, "partner", texts.partner_card(False, "", bool(user.get("share_sex")), None), partner_kb(False))
 
 

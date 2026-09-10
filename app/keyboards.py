@@ -189,6 +189,14 @@ def partner_kb(has_partner: bool) -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
+def partner_viewer_kb() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    _b(b, "Отвязаться", "pair:drop", E.TRASH, style=RED)
+    _back(b)
+    b.adjust(1)
+    return b.as_markup()
+
+
 def pair_confirm_kb(code: str) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     _b(b, "Смотреть цикл", f"pair:yes:{code}", E.CHECK)

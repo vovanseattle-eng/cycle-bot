@@ -36,12 +36,19 @@ MONTHS_GEN = [
 ]
 
 
+def _safe_tz(tz: str | None) -> ZoneInfo:
+    try:
+        return ZoneInfo(tz or DEFAULT_TZ)
+    except Exception:
+        return ZoneInfo(DEFAULT_TZ)
+
+
 def today_in(tz: str | None = None) -> date:
-    return datetime.now(ZoneInfo(tz or DEFAULT_TZ)).date()
+    return datetime.now(_safe_tz(tz)).date()
 
 
 def hour_in(tz: str | None = None) -> int:
-    return datetime.now(ZoneInfo(tz or DEFAULT_TZ)).hour
+    return datetime.now(_safe_tz(tz)).hour
 
 
 def greet(name: str, tz: str | None = None) -> str:

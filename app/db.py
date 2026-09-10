@@ -142,6 +142,7 @@ async def connect() -> aiosqlite.Connection:
         await _db.execute("PRAGMA synchronous=NORMAL")
         await _db.execute("PRAGMA temp_store=MEMORY")
         await _db.execute("PRAGMA cache_size=-8000")
+        await _db.execute("PRAGMA busy_timeout=5000")
         await _db.executescript(SCHEMA)
         await _migrate(_db)
         await _db.commit()
@@ -407,9 +408,9 @@ async def bind_partner(owner_id: int, viewer_id: int) -> None:
     await db.commit()
 
 
-async def unbind_partner(owner_id: int) -> None:
+async def unbind_partner(user_id: int) -> None:
     db = await connect()
-    await db.execute("DELETE FROM partnerships WHERE owner_id = ?", (owner_id,))
+    await db.execute("DELETE FROM partnerships WHERE owner_id = ? OR viewer_id = ?", (user_id, user_id))
     await db.commit()
 
 

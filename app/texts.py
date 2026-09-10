@@ -440,6 +440,15 @@ def partner_invite_card(owner_name: str) -> str:
     )
 
 
+def partner_viewer_card(owner_name: str) -> str:
+    shown = escape(owner_name) or "партнёр"
+    return (
+        f"{head(E.PROFILE, 'ЛУНА · ПАРТНЁР', 'Связанный цикл')}\n\n"
+        f"{pack('Статус', kv('Смотришь', shown), kv('Видно', 'Красные, голубые, задержка, прогноз'), icon=E.PROFILE)}\n"
+        f"{named('Управление', 'Ты можешь отвязаться в любой момент.', E.INFO)}"
+    )
+
+
 def partner_bound(viewer_name: str) -> str:
     shown = escape(viewer_name) or "человек"
     return f"{header('партнёр')}\n\n{named('Новый зритель', f'{shown} теперь видит твой цикл.', E.PROFILE)}"

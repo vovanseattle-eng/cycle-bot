@@ -31,6 +31,14 @@ BANNER_ALIAS = {
     "welcome": "privetstvie",
 }
 
+BANNER_FALLBACK = {
+    "period": "home",
+    "fertile": "home",
+    "calendar": "home",
+    "settings": "home",
+    "history": "home",
+}
+
 
 def _load_disk() -> None:
     global _disk_loaded
@@ -56,7 +64,15 @@ def _load_disk() -> None:
 
 def get_cached_id(key: str) -> str | None:
     _load_disk()
-    return _ids.get(key)
+    if key in _ids:
+        return _ids[key]
+    alias = BANNER_ALIAS.get(key)
+    if alias and alias in _ids:
+        return _ids[alias]
+    fallback = BANNER_FALLBACK.get(key)
+    if fallback and fallback in _ids:
+        return _ids[fallback]
+    return None
 
 
 def save_cached_id(key: str, file_id: str, kind: str | None = None) -> None:
@@ -76,6 +92,8 @@ def banner_path(key: str) -> Path | None:
     if key in BANNER_ALIAS:
         names.append(BANNER_ALIAS[key])
     names.append(key)
+    if key in BANNER_FALLBACK:
+        names.append(BANNER_FALLBACK[key])
     for name in names:
         for ext in (".mp4", ".webm", ".gif", ".png", ".jpg", ".jpeg", ".webp"):
             path = BANNERS / f"{name}{ext}"
@@ -103,6 +121,7 @@ def strip_icons(markup: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup | N
         for btn in row:
             data = btn.model_dump(exclude_none=True)
             data.pop("icon_custom_emoji_id", None)
+            data.pop("style", None)
             fresh.append(InlineKeyboardButton(**data))
         rows.append(fresh)
     return InlineKeyboardMarkup(inline_keyboard=rows)

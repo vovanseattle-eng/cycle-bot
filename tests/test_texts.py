@@ -3,7 +3,7 @@ from datetime import date
 from app.cycle import snapshot
 from app.dates import month_title
 from app.helpers import CAPTION_LIMIT, fit_caption
-from app.keyboards import diary_kb, next_period_kb, settings_cycle_kb, settings_tz_kb
+from app.keyboards import diary_kb, next_period_kb, partner_viewer_kb, settings_cycle_kb, settings_tz_kb
 from app.texts import (
     blue_card,
     calendar_card,
@@ -12,6 +12,8 @@ from app.texts import (
     history_card,
     home_card,
     onboard_intro,
+    partner_card,
+    partner_viewer_card,
     pregnancy_card,
     settings_card,
     tips_card,
@@ -51,6 +53,8 @@ def _cards():
         ("settings", settings_card(user)),
         ("tos", tos_card("Александра")),
         ("onboard", onboard_intro("Александра")),
+        ("partner", partner_card(True, "Иван", True, None)),
+        ("partner_viewer", partner_viewer_card("Александра")),
     ]
 
 
@@ -118,3 +122,12 @@ def test_home_primary_buttons_are_red():
 def test_tz_keyboard_counts():
     n = sum(len(row) for row in settings_tz_kb().inline_keyboard)
     assert n == 10
+
+
+def test_partner_viewer_keyboard():
+    rows = partner_viewer_kb().inline_keyboard
+    assert len(rows) == 2
+    assert rows[0][0].text == "Отвязаться"
+    assert rows[0][0].callback_data == "pair:drop"
+    assert rows[1][0].text == "Назад"
+
