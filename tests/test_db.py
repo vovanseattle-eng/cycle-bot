@@ -187,3 +187,25 @@ def test_pg_cursor():
 
     asyncio.run(run())
 
+
+def test_viewer_priority(temp_db):
+    from app.handlers import viewed_user, _is_viewer_only
+
+    async def run():
+        await db.ensure_user(701, "Алиса")
+        await db.update_user(701, onboarded=1, last_start="2026-09-01", cycle_length=28, period_length=5)
+
+        await db.ensure_user(702, "Парень")
+        await db.update_user(702, onboarded=1, last_start="2026-08-15", cycle_length=30, period_length=4)
+
+        await db.bind_partner(701, 702)
+
+        viewed = await viewed_user(702)
+        assert viewed["tg_id"] == 701
+        assert viewed["name"] == "Алиса"
+
+        assert _is_viewer_only({"onboarded": 1}, viewing_other=True) is True
+        assert _is_viewer_only({"onboarded": 0}, viewing_other=False) is False
+
+    asyncio.run(run())
+

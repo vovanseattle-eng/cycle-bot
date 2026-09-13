@@ -140,7 +140,7 @@ async def load(tg_id: int, name: str = "") -> dict:
 
 
 def _is_viewer_only(me: dict, viewing_other: bool) -> bool:
-    return viewing_other and not me.get("onboarded")
+    return viewing_other
 
 
 async def send_home(target: Message | CallbackQuery, user: dict) -> None:
@@ -149,26 +149,28 @@ async def send_home(target: Message | CallbackQuery, user: dict) -> None:
     snap = user_snap(user)
     viewing_other = False
     name = user.get("name") or ""
-    if not user.get("onboarded"):
-        owners = await db.owners_for_viewer(user["tg_id"])
-        if owners:
-            user = owners[0]
-            snap = user_snap(user)
-            name = user.get("name") or ""
-            viewing_other = True
-        else:
-            await show(target, "welcome", texts.onboard_intro(user.get("name") or "", user.get("tz")), start_kb())
-            return
+    owners = await db.owners_for_viewer(me["tg_id"])
+    if owners:
+        if me.get("onboarded"):
+            await db.update_user(me["tg_id"], onboarded=0, last_start=None, next_override=None)
+            me["onboarded"] = 0
+            me["last_start"] = None
+        user = owners[0]
+        snap = user_snap(user)
+        name = user.get("name") or ""
+        viewing_other = True
+    elif not user.get("onboarded"):
+        await show(target, "welcome", texts.onboard_intro(user.get("name") or "", user.get("tz")), start_kb())
+        return
     text = texts.home_card(snap, name=name, for_partner=viewing_other, tz=user.get("tz"))
     await show(target, "home", text, main_menu_kb(viewer=_is_viewer_only(me, viewing_other)))
 
 
 async def viewed_user(tg_id: int) -> dict:
-    user = await load(tg_id)
-    if user.get("onboarded"):
-        return user
     owners = await db.owners_for_viewer(tg_id)
-    return owners[0] if owners else user
+    if owners:
+        return owners[0]
+    return await load(tg_id)
 
 
 async def send_calendar(
@@ -253,7 +255,7 @@ async def show_preg(target: Message | CallbackQuery) -> None:
 async def show_partner(target: Message | CallbackQuery) -> None:
     user = await load(target.from_user.id)
     owners = await db.owners_for_viewer(user["tg_id"])
-    if owners and not user.get("onboarded"):
+    if owners:
         owner = owners[0]
         owner_name = (owner.get("name") or "партнёр").strip()
         await show(
@@ -707,14 +709,14 @@ async def pair_yes(call: CallbackQuery, state: FSMContext) -> None:
         return
     await db.ensure_user(call.from_user.id, call.from_user.first_name or "")
     await db.bind_partner(owner_id, call.from_user.id)
+    await db.update_user(call.from_user.id, onboarded=0, last_start=None, next_override=None)
     await state.clear()
     owner = await db.get_user(owner_id)
-    me = await load(call.from_user.id)
     await show(
         call,
         "partner",
         texts.home_card(user_snap(owner), name=(owner or {}).get("name") or "", for_partner=True),
-        main_menu_kb(viewer=not me.get("onboarded")),
+        main_menu_kb(viewer=True),
     )
     try:
         await call.bot.send_message(
