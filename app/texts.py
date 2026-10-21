@@ -254,7 +254,7 @@ def blue_card(snap: CycleSnapshot) -> str:
     return "\n".join(lines)
 
 
-def sex_card(rows: list[dict], share: bool) -> str:
+def sex_card(rows: list[dict], share: bool, total: int = 0) -> str:
     lines = [head(E.STAR, "это не Flo · БЛИЗОСТЬ", "Без морали и длинного дневника"), ""]
     if rows:
         recent = "\n".join(
@@ -262,10 +262,48 @@ def sex_card(rows: list[dict], share: bool) -> str:
             for row in rows[:5]
         )
         lines.append(named("Недавно", recent, E.STAR))
+        if total:
+            if total > len(rows[:5]):
+                total_line = f"Отметок: {total}. Остальные — в «Вся история»."
+            else:
+                total_line = f"Отметок: {total}. Все даты — выше."
+            lines.append(named("Всего", total_line, E.STATS))
     else:
         lines.append(named("Недавно", "Пока пусто — и это тоже нормально.", E.STAR))
     lines.append(named("Партнёр", "Видит это" if share else "Не видит это", E.PROFILE))
     return "\n".join(lines)
+
+
+def sex_history_card(rows: list[dict], total: int, page: int, per_page: int = 5) -> str:
+    lines = [head(E.STAR, "это не Flo · ВСЯ ИСТОРИЯ", "Все отмеченные дни, по 5 за раз"), ""]
+    if not rows:
+        lines.append(named("Пока пусто", "Отметок ещё не было.", E.STAR))
+        return "\n".join(lines)
+    listing = "\n".join(
+        f"{fmt_day(date.fromisoformat(row['day']))} · {PROTECTION_LABEL.get(row['protection'], 'Как есть')}"
+        for row in rows
+    )
+    first = page * per_page + 1
+    last = first + len(rows) - 1
+    lines.append(named("Записи", listing, E.STAR))
+    lines.append(named("Показаны", f"{first}–{last} из {total}", E.STATS))
+    lines.append(named("Убрать", "Нажми на дату — спросит, точно ли снимать.", E.TRASH))
+    return "\n".join(lines)
+
+
+def sex_delete_confirm(day_label: str) -> str:
+    return (
+        f"{head(E.TRASH, 'это не Flo · УБРАТЬ ОТМЕТКУ', day_label)}\n\n"
+        f"{named('Точно', 'Отметка за этот день исчезнет. Назад — восстановить будет нельзя.', E.TRASH)}"
+    )
+
+
+def sex_history_hint(total: int) -> str:
+    count = f"Всего отметок: {total}." if total else "Пока нет ни одной отметки."
+    return (
+        f"{head(E.STAR, 'это не Flo · ИСТОРИЯ БЛИЗОСТИ', 'Все отмеченные дни')}\n\n"
+        f"{named('Где смотреть', f'{count} Кнопка «Вся история» — список по 5, листается дальше.', E.FILE)}"
+    )
 
 
 def delay_card(snap: CycleSnapshot, already: bool) -> str:
@@ -489,10 +527,12 @@ def onboard_intro(name: str = "", tz: str | None = None) -> str:
     )
 
 
-def sex_saved(day_label: str, protection: str) -> str:
+def sex_saved(day_label: str, protection: str, updated: bool = False) -> str:
     extra = PROTECTION_LABEL.get(protection, "")
+    title = "это не Flo · ОТМЕЧЕНО" if not updated else "это не Flo · ОБНОВЛЕНО"
+    slogan = "Тихо легло в календарь" if not updated else "За этот день уже было — поправила"
     return (
-        f"{head(E.CHECK, 'это не Flo · ОТМЕЧЕНО', 'Тихо легло в календарь')}\n\n"
+        f"{head(E.CHECK, title, slogan)}\n\n"
         f"{named('Запись', f'{day_label} · {extra}', E.CHECK)}"
     )
 

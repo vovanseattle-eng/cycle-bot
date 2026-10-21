@@ -44,6 +44,8 @@ from app.keyboards import (
     settings_privacy_kb,
     settings_tz_kb,
     sex_prot_kb,
+    sex_delete_kb,
+    sex_history_kb,
     sex_when_kb,
     start_kb,
     tos_kb,
@@ -224,8 +226,22 @@ async def show_sex(target: Message | CallbackQuery, state: FSMContext) -> None:
         await show(target, "welcome", texts.onboard_intro(user.get("name") or "", user.get("tz")), start_kb())
         return
     rows = await db.recent_sex(user["tg_id"])
+    total = await db.sex_days_count(user["tg_id"])
     await state.update_data(purpose="sex")
-    await show(target, "sex", texts.sex_card(rows, bool(user.get("share_sex"))), sex_when_kb())
+    await show(target, "sex", texts.sex_card(rows, bool(user.get("share_sex")), total), sex_when_kb())
+
+
+async def show_sex_history(target: Message | CallbackQuery, page: int = 0, per_page: int = 5) -> None:
+    user = await load(target.from_user.id)
+    rows = await db.recent_sex(user["tg_id"], limit=per_page, offset=page * per_page)
+    total = await db.sex_days_count(user["tg_id"])
+    has_more = (page + 1) * per_page < total
+    await show(
+        target,
+        "sex",
+        texts.sex_history_card(rows, total, page, per_page),
+        sex_history_kb(rows, page, has_more, per_page),
+    )
 
 
 async def show_delay(target: Message | CallbackQuery) -> None:
@@ -390,6 +406,50 @@ async def cb_blue(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "menu:sex")
 async def cb_sex(call: CallbackQuery, state: FSMContext) -> None:
     await show_sex(call, state)
+
+
+@router.callback_query(F.data == "menu:sexhistory")
+async def cb_sex_history(call: CallbackQuery) -> None:
+    await show_sex_history(call, 0)
+
+
+@router.callback_query(F.data.startswith("sexhist:"))
+async def cb_sex_history_page(call: CallbackQuery) -> None:
+    try:
+        page = int(call.data.split(":", 1)[1])
+    except (TypeError, ValueError):
+        page = 0
+    await show_sex_history(call, max(page, 0))
+
+
+@router.callback_query(F.data.startswith("sexdel:"))
+async def cb_sex_delete_ask(call: CallbackQuery) -> None:
+    day = call.data.split(":", 1)[1]
+    try:
+        label = fmt_day(date.fromisoformat(day))
+    except (TypeError, ValueError):
+        await call.answer()
+        return
+    await show(call, "sex", texts.sex_delete_confirm(label), sex_delete_kb(day))
+
+
+@router.callback_query(F.data.startswith("sexdelok:"))
+async def cb_sex_delete_ok(call: CallbackQuery, state: FSMContext) -> None:
+    day = call.data.split(":", 1)[1]
+    try:
+        target_day = date.fromisoformat(day)
+    except (TypeError, ValueError):
+        await call.answer()
+        return
+    user = await load(call.from_user.id)
+    await db.delete_sex(user["tg_id"], target_day)
+    await state.update_data(purpose="sex")
+    await show_sex(call, state)
+
+
+@router.callback_query(F.data == "sexdelno")
+async def cb_sex_delete_no(call: CallbackQuery) -> None:
+    await show_sex_history(call, 0)
 
 
 @router.callback_query(F.data == "menu:delay")
@@ -649,10 +709,15 @@ async def pick_sex_prot(call: CallbackQuery, state: FSMContext) -> None:
         return
     chosen = date.fromisoformat(iso)
     user = await load(call.from_user.id)
-    await db.add_sex(user["tg_id"], chosen, protection)
+    result = await db.add_sex(user["tg_id"], chosen, protection)
     await state.clear()
     fresh = await load(call.from_user.id)
-    await show(call, "sex", texts.sex_saved(fmt_day(chosen), protection), sex_when_kb())
+    await show(
+        call,
+        "sex",
+        texts.sex_saved(fmt_day(chosen), protection, updated=result == "updated"),
+        sex_when_kb(),
+    )
     if fresh.get("share_sex"):
         await ping_viewers(call.bot, fresh, "sex", extra=fmt_day(chosen))
 
@@ -943,3 +1008,22 @@ async def sprot_stale(call: CallbackQuery) -> None:
 @router.callback_query()
 async def unknown_cb(call: CallbackQuery) -> None:
     await call.answer()
+
+
+# Свободный текст про историю отметок. Регистрируется последним, чтобы не
+# перехватывать кнопки и заметки дневника.
+@router.message(F.text.regexp(r"(?i)(посмотреть|смотреть|истори|предыдущ|прошл|когда был|какие даты)", mode="search"))
+async def msg_history_hint(message: Message, state: FSMContext) -> None:
+    if await state.get_state():
+        return
+    user = await load(message.from_user.id)
+    if not user.get("onboarded"):
+        await show(message, "welcome", texts.onboard_intro(user.get("name") or "", user.get("tz")), start_kb())
+        return
+    total = await db.sex_days_count(user["tg_id"])
+    await show(
+        message,
+        "sex",
+        texts.sex_history_hint(total),
+        sex_when_kb(),
+    )

@@ -1,10 +1,24 @@
 import asyncio
 import os
+import sqlite3
 import tempfile
 from datetime import date
 import pytest
 
 from app import db
+
+
+def _raw_insert_sex(user_id: int, day: str, protection: str = "yes", created: str = "2026-10-18T12:00:00+00:00") -> None:
+    """Прямая вставка в обход db.add_sex — чтобы посадить исторический дубль."""
+    con = sqlite3.connect(str(db.DB_PATH))
+    try:
+        con.execute(
+            "INSERT INTO sex_logs (user_id, day, protection, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, day, protection, created),
+        )
+        con.commit()
+    finally:
+        con.close()
 
 
 @pytest.fixture
@@ -92,6 +106,123 @@ def test_sex_and_delay(temp_db):
         assert await db.delay_marked(200, expected) is True
         # duplicate mark returns False
         assert await db.mark_delay(200, expected) is False
+
+    asyncio.run(run())
+
+
+def test_add_sex_is_upsert(temp_db):
+    async def run():
+        await db.ensure_user(210, "Даша")
+
+        first = await db.add_sex(210, date(2026, 10, 18), "yes")
+        assert first == "created"
+
+        second = await db.add_sex(210, date(2026, 10, 18), "yes")
+        assert second == "updated"
+
+        # другой день — новая запись
+        third = await db.add_sex(210, date(2026, 10, 16), "no")
+        assert third == "created"
+
+        logs = await db.recent_sex(210)
+        assert len(logs) == 2
+        assert [row["day"] for row in logs] == ["2026-10-18", "2026-10-16"]
+        assert logs[0]["protection"] == "yes"
+
+    asyncio.run(run())
+
+
+def test_add_sex_updates_protection(temp_db):
+    async def run():
+        await db.ensure_user(215, "Вера")
+        await db.add_sex(215, date(2026, 10, 18), "yes")
+        result = await db.add_sex(215, date(2026, 10, 18), "no")
+        assert result == "updated"
+
+        logs = await db.recent_sex(215)
+        assert len(logs) == 1
+        assert logs[0]["protection"] == "no"
+
+    asyncio.run(run())
+
+
+def test_recent_sex_collapses_legacy_duplicates(temp_db):
+    async def run():
+        await db.ensure_user(220, "Лена")
+        # Исторический дубль: две строки за один день, вставлены напрямую.
+        _raw_insert_sex(220, "2026-10-18", "yes", "2026-10-18T10:00:00+00:00")
+        _raw_insert_sex(220, "2026-10-18", "yes", "2026-10-18T12:00:00+00:00")
+
+        rows = await db.recent_sex(220)
+        assert len(rows) == 1
+        assert rows[0]["day"] == "2026-10-18"
+
+        # Обе строки остались в базе — ничего не удалено.
+        con = sqlite3.connect(str(db.DB_PATH))
+        try:
+            n = con.execute("SELECT COUNT(*) FROM sex_logs WHERE user_id = ?", (220,)).fetchone()[0]
+        finally:
+            con.close()
+        assert n == 2
+
+    asyncio.run(run())
+
+
+def test_sex_days_count_counts_days_not_rows(temp_db):
+    async def run():
+        await db.ensure_user(230, "Ира")
+        await db.add_sex(230, date(2026, 10, 18), "yes")
+        await db.add_sex(230, date(2026, 10, 18), "yes")
+        await db.add_sex(230, date(2026, 10, 16), "yes")
+        await db.add_sex(230, date(2026, 9, 15), "no")
+
+        assert await db.sex_days_count(230) == 3
+
+    asyncio.run(run())
+
+
+def test_recent_sex_offset_pages_history(temp_db):
+    async def run():
+        await db.ensure_user(240, "Света")
+        for day in (1, 2, 3, 4, 5, 6, 7):
+            await db.add_sex(240, date(2026, 10, day), "yes")
+
+        page1 = await db.recent_sex(240, limit=5, offset=0)
+        page2 = await db.recent_sex(240, limit=5, offset=5)
+        assert len(page1) == 5
+        assert len(page2) == 2
+        assert page1[0]["day"] == "2026-10-07"
+        assert page2[-1]["day"] == "2026-10-01"
+
+    asyncio.run(run())
+
+
+def test_delete_sex_removes_only_that_day(temp_db):
+    async def run():
+        await db.ensure_user(250, "Юля")
+        await db.add_sex(250, date(2026, 10, 18), "yes")
+        await db.add_sex(250, date(2026, 10, 16), "yes")
+
+        removed = await db.delete_sex(250, date(2026, 10, 18))
+        assert removed == 1
+
+        rows = await db.recent_sex(250)
+        assert [row["day"] for row in rows] == ["2026-10-16"]
+
+        # Повторное удаление — ноль, без ошибки.
+        assert await db.delete_sex(250, date(2026, 10, 18)) == 0
+
+    asyncio.run(run())
+
+
+def test_delete_sex_clears_all_duplicates_for_day(temp_db):
+    async def run():
+        await db.ensure_user(255, "Настя")
+        _raw_insert_sex(255, "2026-10-18", "yes", "2026-10-18T10:00:00+00:00")
+        _raw_insert_sex(255, "2026-10-18", "yes", "2026-10-18T12:00:00+00:00")
+
+        assert await db.delete_sex(255, date(2026, 10, 18)) == 2
+        assert await db.sex_days_count(255) == 0
 
     asyncio.run(run())
 

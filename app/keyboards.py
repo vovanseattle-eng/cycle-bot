@@ -6,7 +6,7 @@ from datetime import date
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.dates import WEEKDAYS, month_title
+from app.dates import WEEKDAYS, fmt_day, month_title
 from app.emoji import E
 
 BTN_HOME = "✦ сегодня"
@@ -141,8 +141,43 @@ def sex_when_kb() -> InlineKeyboardMarkup:
     _b(b, "Сегодня", "sex:today", E.CHECK, style=RED)
     _b(b, "Вчера", "sex:yesterday", E.STATS)
     _b(b, "Другая дата", "cal:open:sex", E.FILE)
+    _b(b, "Вся история", "menu:sexhistory", E.FILE)
     _back(b)
-    b.adjust(2, 1, 1)
+    b.adjust(2, 1, 1, 1)
+    return b.as_markup()
+
+
+def sex_history_kb(rows: list[dict], page: int, has_more: bool, per_page: int = 5) -> InlineKeyboardMarkup:
+    """Список истории. Сама дата — кнопка: тап открывает подтверждение отмены."""
+    b = InlineKeyboardBuilder()
+    for row in rows:
+        day = row.get("day") or ""
+        if not day:
+            continue
+        try:
+            label = fmt_day(date.fromisoformat(day))
+        except ValueError:
+            label = day
+        _b(b, label, f"sexdel:{day}", E.TRASH, style=RED)
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="← Новые", callback_data=f"sexhist:{page - 1}", icon_custom_emoji_id=E.BACK))
+    if has_more:
+        nav.append(InlineKeyboardButton(text="Старые →", callback_data=f"sexhist:{page + 1}", icon_custom_emoji_id=E.FORWARD))
+    if nav:
+        b.adjust(1)
+        b.row(*nav)
+    else:
+        b.adjust(1)
+    b.row(InlineKeyboardButton(text="Назад", callback_data="menu:sex", icon_custom_emoji_id=E.BACK))
+    return b.as_markup()
+
+
+def sex_delete_kb(day: str) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    _b(b, "Да, убрать", f"sexdelok:{day}", E.TRASH, style=RED)
+    _b(b, "Отмена", "sexdelno", E.CROSS)
+    b.adjust(2, 1)
     return b.as_markup()
 
 

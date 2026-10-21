@@ -5,6 +5,8 @@ __pycache__/
 *.db-journal
 *.db-wal
 *.db-shm
+*.db.bak
+backup/
 .env
 .env.*
 !.env.example

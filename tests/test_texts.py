@@ -15,6 +15,11 @@ from app.texts import (
     partner_card,
     partner_viewer_card,
     pregnancy_card,
+    sex_card,
+    sex_delete_confirm,
+    sex_history_card,
+    sex_history_hint,
+    sex_saved,
     settings_card,
     tips_card,
     tos_card,
@@ -130,4 +135,107 @@ def test_partner_viewer_keyboard():
     assert rows[0][0].text == "Отвязаться"
     assert rows[0][0].callback_data == "pair:drop"
     assert rows[1][0].text == "Назад"
+
+
+def _sex_rows(n: int = 3):
+    return [
+        {"day": f"2026-10-{18 - i:02d}", "protection": "yes"}
+        for i in range(n)
+    ]
+
+
+def test_sex_card_shows_total_and_partner():
+    text = sex_card(_sex_rows(3), True, total=12)
+    assert "БЛИЗОСТЬ" in text
+    assert "Видит это" in text
+    assert "12" in text
+    assert len(text) <= CAPTION_LIMIT
+
+
+def test_sex_card_hides_partner_when_not_shared():
+    text = sex_card(_sex_rows(3), False, total=3)
+    assert "Не видит это" in text
+    assert "Видит это" not in text.replace("Не видит это", "")
+
+
+def test_sex_history_card_shows_range():
+    text = sex_history_card(_sex_rows(5), total=12, page=0, per_page=5)
+    assert "1–5 из 12" in text
+    assert len(text) <= CAPTION_LIMIT
+
+
+def test_sex_history_card_second_page_range():
+    text = sex_history_card(_sex_rows(2), total=12, page=2, per_page=5)
+    assert "11–12 из 12" in text
+
+
+def test_sex_history_card_empty():
+    text = sex_history_card([], total=0, page=0, per_page=5)
+    assert "Пока пусто" in text
+
+
+def test_sex_delete_confirm_warns():
+    text = sex_delete_confirm("18 октября")
+    assert "18 октября" in text
+    assert "нельзя" in text
+
+
+def test_sex_saved_distinguishes_update():
+    assert "ОБНОВЛЕНО" in sex_saved("18 октября", "yes", updated=True)
+    assert "ОТМЕЧЕНО" in sex_saved("18 октября", "yes")
+    assert "ОБНОВЛЕНО" not in sex_saved("18 октября", "yes")
+
+
+def test_sex_history_hint_mentions_button():
+    text = sex_history_hint(7)
+    assert "Вся история" in text
+    assert "7" in text
+    assert len(text) <= CAPTION_LIMIT
+
+
+def test_sex_when_keyboard_has_history_button():
+    from app.keyboards import sex_when_kb
+
+    labels = [btn.text for row in sex_when_kb().inline_keyboard for btn in row]
+    assert "Вся история" in labels
+
+
+def test_sex_history_keyboard_has_delete_and_paging():
+    from app.keyboards import sex_history_kb
+
+    rows = _sex_rows(3)
+    markup = sex_history_kb(rows, page=1, has_more=True, per_page=5)
+    flat = [(btn.text, btn.callback_data) for row in markup.inline_keyboard for btn in row]
+    assert any(cb == "sexdel:2026-10-18" for _, cb in flat)
+    assert any(cb == "sexhist:2" for _, cb in flat)
+    assert any(cb == "sexhist:0" for _, cb in flat)
+    # Назад ведёт в карточку «Близость»
+    assert any(cb == "menu:sex" for _, cb in flat)
+
+    last = sex_history_kb(rows, page=0, has_more=False, per_page=5)
+    flat_last = [btn.callback_data for row in last.inline_keyboard for btn in row]
+    assert "sexhist:1" not in flat_last
+    assert "sexhist:-1" not in flat_last
+
+
+def test_sex_history_keyboard_one_button_per_date():
+    from app.keyboards import sex_history_kb
+
+    rows = _sex_rows(3)
+    markup = sex_history_kb(rows, page=0, has_more=False, per_page=5)
+    # Каждая дата — отдельная кнопка-строка, без «Убрать» в подписи.
+    date_buttons = [
+        btn for row in markup.inline_keyboard for btn in row
+        if (btn.callback_data or "").startswith("sexdel:")
+    ]
+    assert len(date_buttons) == 3
+    assert date_buttons[0].text == "18 октября"
+
+
+def test_sex_delete_keyboard():
+    from app.keyboards import sex_delete_kb
+
+    flat = [(btn.text, btn.callback_data) for row in sex_delete_kb("2026-10-18").inline_keyboard for btn in row]
+    assert ("Да, убрать", "sexdelok:2026-10-18") in flat
+    assert ("Отмена", "sexdelno") in flat
 

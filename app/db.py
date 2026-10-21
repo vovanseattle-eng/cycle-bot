@@ -490,22 +490,86 @@ async def all_notify_users() -> list[dict[str, Any]]:
     return [dict(r) for r in await cur.fetchall()]
 
 
-async def add_sex(user_id: int, day: date, protection: str) -> None:
+async def add_sex(user_id: int, day: date, protection: str) -> str:
+    """Отметка близости за день.
+
+    Возвращает "created" (новая запись) или "updated" (запись за этот день уже была —
+    обновили вид защиты). Дубли за один день не создаются.
+    """
     db = await connect()
+    cur = await db.execute(
+        "SELECT id FROM sex_logs WHERE user_id = ? AND day = ? ORDER BY id DESC LIMIT 1",
+        (user_id, day.isoformat()),
+    )
+    row = await cur.fetchone()
+    if row:
+        await db.execute(
+            "UPDATE sex_logs SET protection = ? WHERE id = ?",
+            (protection, row["id"]),
+        )
+        await db.commit()
+        return "updated"
     await db.execute(
         "INSERT INTO sex_logs (user_id, day, protection, created_at) VALUES (?, ?, ?, ?)",
         (user_id, day.isoformat(), protection, _now()),
     )
     await db.commit()
+    return "created"
 
 
-async def recent_sex(user_id: int, limit: int = 8) -> list[dict[str, Any]]:
+async def recent_sex(user_id: int, limit: int = 8, offset: int = 0) -> list[dict[str, Any]]:
+    """Записи близости, одна строка на день.
+
+    Исторические дубли (появились до фикса) схлопываются на чтении: берётся
+    последняя запись за день. Сами строки в базе остаются нетронутыми.
+    """
     db = await connect()
     cur = await db.execute(
-        "SELECT * FROM sex_logs WHERE user_id = ? ORDER BY day DESC, id DESC LIMIT ?",
-        (user_id, limit),
+        """
+        SELECT s.* FROM sex_logs s
+        JOIN (
+            SELECT day, MAX(id) AS last_id FROM sex_logs WHERE user_id = ? GROUP BY day
+        ) d ON d.last_id = s.id
+        WHERE s.user_id = ?
+        ORDER BY s.day DESC, s.id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (user_id, user_id, limit, offset),
     )
     return [dict(r) for r in await cur.fetchall()]
+
+
+async def sex_days_count(user_id: int) -> int:
+    """Сколько дней с отметками (уникальных, без дублей)."""
+    db = await connect()
+    cur = await db.execute(
+        "SELECT COUNT(DISTINCT day) AS c FROM sex_logs WHERE user_id = ?",
+        (user_id,),
+    )
+    row = await cur.fetchone()
+    return int(row["c"]) if row else 0
+
+
+async def delete_sex(user_id: int, day: date) -> int:
+    """Убрать отметку за день. Вызывается только после явного подтверждения.
+
+    Удаляет все строки за этот день — чтобы отметка исчезла полностью.
+    """
+    db = await connect()
+    cur = await db.execute(
+        "SELECT COUNT(*) AS c FROM sex_logs WHERE user_id = ? AND day = ?",
+        (user_id, day.isoformat()),
+    )
+    row = await cur.fetchone()
+    count = int(row["c"]) if row else 0
+    if not count:
+        return 0
+    await db.execute(
+        "DELETE FROM sex_logs WHERE user_id = ? AND day = ?",
+        (user_id, day.isoformat()),
+    )
+    await db.commit()
+    return count
 
 
 async def sex_on(user_id: int, day: date) -> bool:
