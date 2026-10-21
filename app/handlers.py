@@ -1012,7 +1012,8 @@ async def unknown_cb(call: CallbackQuery) -> None:
 
 # Свободный текст про историю отметок. Регистрируется последним, чтобы не
 # перехватывать кнопки и заметки дневника.
-@router.message(F.text.regexp(r"(?i)(посмотреть|смотреть|истори|предыдущ|прошл|когда был|какие даты)", mode="search"))
+# Паттерн с ".*" вместо mode="search" — работает в любой версии magic_filter.
+@router.message(F.text.regexp(r"(?i).*(посмотреть|смотреть|истори|предыдущ|прошл|когда был|какие даты)"))
 async def msg_history_hint(message: Message, state: FSMContext) -> None:
     if await state.get_state():
         return
