@@ -30,11 +30,13 @@ async def ping_viewers(bot: Bot, owner: dict, kind: str, extra: str = "") -> Non
             body += f" · {extra}"
     elif kind == "fertile":
         body = f"У {name} сегодня голубые дни"
+    elif kind == "red_day":
+        # Дни 2..N красных: партнёру каждый день, «день 2», «день 3», …
+        body = f"У {name} красные дни · {extra}"
     else:
         body = extra or f"Обновление цикла · {name}"
 
-    if kind == "sex" and not owner.get("share_sex"):
-        return
+    # Близость идёт партнёру всегда (FR-3): share_sex гейт снят.
     if kind == "delay" and not owner.get("share_delay", 1):
         return
 
@@ -65,6 +67,19 @@ async def daily_tick(bot: Bot) -> None:
             kinds.append(("delay_7", f"{head(E.STATS, 'это не Flo · ЗАДЕРЖКА', '')}\n\n{named('Статус', 'Неделя. Если был секс без защиты — тест.', E.STATS)}"))
         if user.get("notify_before", 1) and snap.next_period and (snap.next_period - snap.today).days == 1:
             kinds.append(("red_tomorrow", f"{head(E.BELL, 'это не Flo · ЗАВТРА', '')}\n\n{named('Прогноз', 'Завтра красные дни.', E.BELL)}"))
+
+        # Каждый день красных после первого — только партнёру (FR-1, FR-2).
+        # Дедуп — notify_sent по kind f"red_day{N}" и дате на стороне владельца: тик
+        # владельца шлёт пинг партнёру один раз в день. Сам владелец эти уведомления не
+        # получает (день 1 уже покрыт red_today).
+        if (
+            user.get("notify_red", 1)
+            and snap.red_start
+            and snap.red_start < snap.today <= (snap.red_end or snap.today)
+        ):
+            day_n = (snap.today - snap.red_start).days + 1
+            if await db.notify_once(user["tg_id"], f"red_day{day_n}", snap.today):
+                await ping_viewers(bot, user, "red_day", extra=f"день {day_n}")
 
         for kind, text in kinds:
             if await db.notify_once(user["tg_id"], kind, snap.today):
