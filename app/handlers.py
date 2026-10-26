@@ -141,6 +141,12 @@ async def load(tg_id: int, name: str = "") -> dict:
     return await db.ensure_user(tg_id, name)
 
 
+async def ping_period_marked(bot, tg_id: int, chosen) -> None:
+    """Моментальный пинг партнёру при отметке красных (FR-4, AC-3)."""
+    fresh = await load(tg_id)
+    await ping_viewers(bot, fresh, "period", extra=fmt_day(chosen))
+
+
 def _is_viewer_only(me: dict, viewing_other: bool) -> bool:
     return viewing_other
 
@@ -668,6 +674,7 @@ async def pick_plen(call: CallbackQuery, state: FSMContext) -> None:
         await send_home(call, await load(call.from_user.id))
         return
     await db.set_period(user["tg_id"], chosen, length)
+    await ping_period_marked(call.bot, user["tg_id"], chosen)
     await state.update_data(chosen=chosen.isoformat(), period_length=length)
     await state.set_state(Flow.pick_next)
     await show(call, "home", texts.cycle_len_card(), next_period_kb(chosen, back="menu:red"))
@@ -689,6 +696,7 @@ async def pick_clen(call: CallbackQuery, state: FSMContext) -> None:
         chosen = date.fromisoformat(iso)
         plen = int(data.get("period_length") or user.get("period_length") or 5)
         await db.set_period(user["tg_id"], chosen, plen)
+        await ping_period_marked(call.bot, user["tg_id"], chosen)
         await db.update_user(user["tg_id"], cycle_length=length, name=call.from_user.first_name or "")
         await state.clear()
         await call.answer("Цикл собран")
@@ -989,6 +997,9 @@ async def set_notify(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "set:sexshare")
+# Хвост старых настроек: клавиатура шлёт tgl:share_sex (общий tgl_value), этот
+# маршрут больше ниоткуда не вызывается. Оставлен намеренно — удаление расширяет
+# дифф без пользы (см. спеку partner-cycle-notify, D4).
 async def set_sexshare(call: CallbackQuery) -> None:
     user = await load(call.from_user.id)
     await db.update_user(user["tg_id"], share_sex=0 if user.get("share_sex") else 1)
