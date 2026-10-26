@@ -12,7 +12,7 @@
 set -uo pipefail
 
 REPO_RAW="https://raw.githubusercontent.com/vovanseattle-eng/cycle-bot/main"
-FILES="app/db.py app/handlers.py app/keyboards.py app/texts.py"
+FILES="app/db.py app/notify.py app/handlers.py app/keyboards.py app/texts.py"
 
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[!]\033[0m %s\n' "$*"; }
