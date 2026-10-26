@@ -395,7 +395,8 @@ def settings_privacy_kb(user: dict) -> InlineKeyboardMarkup:
         return f"{title}: Открыто" if on else f"{title}: Скрыто"
 
     b = InlineKeyboardBuilder()
-    _b(b, lab(bool(user.get("share_sex")), "Близость"), "tgl:share_sex", E.STAR)
+    # Кнопка «Близость» убрана: видимость близости теперь всегда включена (FR-3),
+    # toggle был бы мёртвым. tgl:share_sex больше ниоткуда не отправляется.
     _b(b, lab(bool(user.get("share_delay", 1)), "Задержка"), "tgl:share_delay", E.STATS)
     _b(b, lab(bool(user.get("share_diary")), "Дневник"), "tgl:share_diary", E.EDIT)
     _back(b, "menu:settings")

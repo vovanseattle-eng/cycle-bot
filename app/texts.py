@@ -452,20 +452,22 @@ def pregnancy_card(snap: CycleSnapshot, intent: str = INTENT_TRACK, sex_rows: li
 
 
 def partner_card(has_partner: bool, partner_name: str, share_sex: bool, link: str | None) -> str:
+    # share_sex больше не управляет доставкой (близость видна партнёру всегда);
+    # параметр оставлен в сигнатуре ради совместимости вызовов.
     lines = [head(E.PROFILE, "это не Flo · ПАРТНЁР", "Один человек, которому это можно видеть"), ""]
     if has_partner:
         lines.append(pack(
             "Доступ",
             kv("Смотрит", partner_name or "без имени"),
             kv("Видит", "Красные, голубые, задержку и прогноз"),
-            kv("Близость", "Открыта" if share_sex else "Скрыта"),
+            kv("Близость", "Видна партнёру"),
             icon=E.PROFILE,
         ))
         lines.append(named("Ссылка", "Новая ссылка гасит старую. Можно отвязать.", E.LINK))
     else:
         lines.append(named(
             "Доступ",
-            "Красные, голубые, задержка — как у тебя в боте. Близость по желанию, по умолчанию скрыта.",
+            "Красные, голубые, задержка и близость — как у тебя в боте.",
             E.PROFILE,
         ))
         if link:
@@ -589,8 +591,8 @@ def settings_privacy_card(user: dict) -> str:
 
     return (
         f"{head(E.PROFILE, 'это не Flo · ПРИВАТНОСТЬ', 'Что видит партнёр')}\n\n"
-        f"{pack('Партнёр', kv('Близость', vis('share_sex', 0)), kv('Задержка', vis('share_delay', 1)), kv('Дневник', vis('share_diary', 0)), icon=E.PROFILE)}\n"
-        f"{named('Цикл', 'Красные, голубые и прогноз видны всегда, если партнёр привязан.', E.STATS)}"
+        f"{pack('Партнёр', kv('Близость', 'Видит'), kv('Задержка', vis('share_delay', 1)), kv('Дневник', vis('share_diary', 0)), icon=E.PROFILE)}\n"
+        f"{named('Цикл', 'Красные (каждый день), голубые, близость и прогноз видны, если партнёр привязан.', E.STATS)}"
     )
 
 
